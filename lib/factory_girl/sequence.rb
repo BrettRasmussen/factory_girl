@@ -4,10 +4,13 @@ class Factory
   class SequenceAbuseError < StandardError; end
 
   # Sequences are defined using Factory.sequence. Sequence values are generated
-  # using next.
+  # using next.  Calling reset rewinds to the beginning (for both the infinite
+  # value counter and the enumeration if provided).
   class Sequence
 
-    def initialize (&proc) #:nodoc:
+    def initialize (enum, &proc) #:nodoc:
+      @enum = enum.to_a if !enum.nil?
+      @enum_idx = 0
       @proc  = proc
       @value = 0
     end
@@ -15,7 +18,21 @@ class Factory
     # Returns the next value for this sequence
     def next
       @value += 1
-      @proc.call(@value)
+      retval = case @proc.arity
+        when 1
+          @enum ? @proc.call(@enum[@enum_idx]) : @proc.call(@value) 
+        when 2
+          @proc.call(@enum[@enum_idx], @value)
+      end
+      if @enum
+        @enum_idx = (@enum_idx+1 == @enum.size) ? 0 : @enum_idx+1
+      end
+      retval
+    end
+
+    def reset
+      @value = 0
+      @enum_idx = 0
     end
 
   end
@@ -31,6 +48,9 @@ class Factory
   #   name: (Symbol)
   #     A unique name for this sequence. This name will be referenced when
   #     calling next to generate new values from this sequence.
+  #   enum: (Array or Range)
+  #     A delineated list of items (usually strings) to cycle through instead
+  #     of, or in addition to, the normal infinite counter.
   #   block: (Proc)
   #     The code to generate each value in the sequence. This block will be
   #     called with a unique number each time a value in the sequence is to be
@@ -40,8 +60,8 @@ class Factory
   # Example:
   #   
   #   Factory.sequence(:email) {|n| "somebody_#{n}@example.com" }
-  def self.sequence (name, &block)
-    self.sequences[name] = Sequence.new(&block)
+  def self.sequence (name, enum = nil, &block)
+    self.sequences[name] = Sequence.new(enum, &block)
   end
 
   # Generates and returns the next value in a sequence.
@@ -60,4 +80,9 @@ class Factory
     self.sequences[sequence].next
   end
 
+  # Resets a sequence to the beginning for both the infinite value counter and
+  # the delineated enumeration if provided.
+  def self.reset (name)
+    self.sequences[name].reset
+  end
 end
