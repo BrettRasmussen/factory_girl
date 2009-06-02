@@ -8,7 +8,7 @@ class Factory
   # value counter and the enumeration if provided).
   class Sequence
 
-    def initialize (enum, &proc) #:nodoc:
+    def initialize (enum = nil, &proc) #:nodoc:
       @enum = enum.to_a if !enum.nil?
       @enum_idx = 0
       @proc  = proc
